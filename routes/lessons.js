@@ -5,6 +5,7 @@ import { ObjectId } from "mongodb";
 const router = express.Router();
 const LESSON_COLL = "lesson"; // collection name 
 
+// Fetch all lessons with optional sort query
 // GET /lessons  
 router.get("/", async (req, res) => {
   try {
