@@ -52,6 +52,7 @@ router.get("/:id", async (req, res) => {
   }
 });
 
+// Update lesson fields, converting numeric strings when needed
 // PUT /lessons/:id  
 router.put("/:id", async (req, res) => {
   try {
