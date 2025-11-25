@@ -11,6 +11,7 @@ if (!MONGO_URI) {
   process.exit(1);
 }
 
+// Static initial dataset for seeding lessons collection
 const lessons = [
   { id: 1, subject: 'Mathematics', location: 'Edinburgh', price: 12.5, spaces: 5, icon: 'fa-solid fa-calculator', rating: 4 },
   { id: 2, subject: 'English', location: 'Oxford', price: 11.0, spaces: 5, icon: 'fa-solid fa-book', rating: 3 },
