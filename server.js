@@ -15,39 +15,41 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Middleware
+// ===== MIDDLEWARE =====
 app.use(cors());
 app.use(express.json());
 app.use(logger);
 
-// Always convert :id params to Number 
+// ===== Convert :id params to numbers =====
 app.param("id", (req, res, next, id) => {
   const numericId = Number(id);
+
   if (isNaN(numericId)) {
     return res.status(400).json({ error: "Invalid id format" });
   }
+
   req.id = numericId;
   next();
 });
 
-// Static Image Middleware
+// ===== STATIC IMAGE SERVING =====
 
-// First: Serve images that exist
+// 1. Serve images normally
 app.use("/images", express.static(path.join(process.cwd(), "images")));
 
-// Second: Custom handler for images that do not exist
+// 2. Custom 404 for missing images
 app.use("/images", (req, res, next) => {
-  const reqPath = req.path.replace(/\?.*$/, ""); // remove query params
-  const filePath = path.join(process.cwd(), reqPath);
+  const reqPath = req.path.replace(/\?.*$/, "");
+  const filePath = path.join(process.cwd(), "images", reqPath);
 
   if (!fs.existsSync(filePath)) {
     return res.status(404).json({ error: "Image not found" });
   }
 
-  next(); // exists then static already served it
+  next();
 });
 
-// DB connect + Routes 
+// ===== DATABASE + ROUTES =====
 connectDB()
   .then(() => {
     console.log("MongoDB connected successfully.");
@@ -57,15 +59,14 @@ connectDB()
     app.use("/orders", ordersRouter);
     app.use("/search", searchRouter);
 
-    // Serve frontend static files (CSS, JS, images, etc)
-    app.use(express.static(process.cwd()));
+    // ===== SERVE FRONTEND STATIC FILES =====
+    app.use(express.static(path.join(process.cwd(), "../cw1frontend")));
 
-    // Frontend root route
     app.get("/", (req, res) => {
-      res.sendFile(path.join(process.cwd(), "index.html"));
+      res.sendFile(path.join(process.cwd(), "../cw1frontend/index.html"));
     });
 
-    // Fallback for unmatched routes
+    // 404 fallback
     app.use((req, res) => {
       res.status(404).send("Route not found");
     });
@@ -79,3 +80,4 @@ connectDB()
     console.error("Failed to connect to MongoDB:", err);
     process.exit(1);
   });
+
