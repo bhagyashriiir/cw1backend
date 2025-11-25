@@ -25,6 +25,7 @@ router.get("/", async (req, res) => {
   }
 });
 
+// Retrieve a single lesson by numeric or ObjectId
 // GET /lessons/:id  
 router.get("/:id", async (req, res) => {
   try {
