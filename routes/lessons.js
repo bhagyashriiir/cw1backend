@@ -5,7 +5,7 @@ import { ObjectId } from "mongodb";
 const router = express.Router();
 const LESSON_COLL = "lesson"; // collection name 
 
-// Fetch all lessons with optional sort query
+// Fetch all lessons with sort query
 // GET /lessons  
 router.get("/", async (req, res) => {
   try {
@@ -52,7 +52,7 @@ router.get("/:id", async (req, res) => {
   }
 });
 
-// Update lesson fields, converting numeric strings when needed
+// Update lesson fields, converting numeric strings 
 // PUT /lessons/:id  
 router.put("/:id", async (req, res) => {
   try {

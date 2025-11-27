@@ -1,8 +1,5 @@
 import fs from "fs";
 
-/**
- * Middleware that checks whether an image exists. If not it returns error.
- */
 // Middleware to validate existence of requested image files
 export function staticImageHandler(folderPath) {
   return (req, res, next) => {

@@ -5,7 +5,6 @@ const router = express.Router();
 const ORDER_COLL = "order";
 
 // POST /orders -save a new order
-// Save new order and compute lessonIDs + total spaces automatically
 router.post("/", async (req, res) => {
   try {
     const db = getDB();

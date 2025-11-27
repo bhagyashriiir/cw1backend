@@ -4,7 +4,6 @@ import { getDB } from "../db.js";
 const router = express.Router();
 const LESSON_COLL = "lesson";
 
-// Perform case-insensitive text search and optional numeric search
 // GET /search?q=term
 router.get("/", async (req, res) => {
   try {

@@ -16,12 +16,12 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// ===== MIDDLEWARE =====
+// MIDDLEWARE 
 app.use(cors());
 app.use(express.json());
 app.use(logger);
 
-// ===== Convert :id params to numbers =====
+// Convert :id params to numbers 
 app.param("id", (req, res, next, id) => {
   const numericId = Number(id);
 
@@ -33,12 +33,12 @@ app.param("id", (req, res, next, id) => {
   next();
 });
 
-// ===== STATIC IMAGE SERVING =====
+// Static image serving
 
 // 1. Serve images normally
 app.use("/images", express.static(path.join(process.cwd(), "images")));
 
-// 2. Custom 404 for missing images
+// 2. 404 for missing images
 app.use("/images", (req, res, next) => {
   const reqPath = req.path.replace(/\?.*$/, "");
   const filePath = path.join(process.cwd(), "images", reqPath);
@@ -50,7 +50,7 @@ app.use("/images", (req, res, next) => {
   next();
 });
 
-// ===== DATABASE + ROUTES =====
+// Database + Routes
 connectDB()
   .then(() => {
     console.log("MongoDB connected successfully.");
@@ -61,11 +61,11 @@ connectDB()
     app.use("/search", searchRouter);
 
     // ===== SERVE FRONTEND STATIC FILES =====
-    app.use(express.static(path.join(process.cwd(), "../cw1frontend")));
+    // app.use(express.static(path.join(process.cwd(), "../cw1frontend")));
 
-    app.get("/", (req, res) => {
-      res.sendFile(path.join(process.cwd(), "../cw1frontend/index.html"));
-    });
+    // app.get("/", (req, res) => {
+     //  res.sendFile(path.join(process.cwd(), "../cw1frontend/index.html"));
+    // });
 
     // 404 fallback
     app.use((req, res) => {
