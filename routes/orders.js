@@ -1,56 +1,50 @@
 import express from "express";
 import { getDB } from "../db.js";
-import { ObjectId } from "mongodb";   // <<< IMPORTANT
 
 const router = express.Router();
 const ORDER_COLL = "order";
+const LESSON_COLL = "lessons";   // <<—— Needed to fetch subjects & price
 
+// POST /orders
 router.post("/", async (req, res) => {
   try {
     const db = getDB();
     const newOrder = req.body;
 
-    if (!newOrder || Object.keys(newOrder).length === 0) {
-      return res.status(400).json({ error: "Order data is required" });
+    if (!newOrder || !Array.isArray(newOrder.items)) {
+      return res.status(400).json({ error: "Invalid order format" });
     }
 
-    // Convert items to final readable format
-    if (Array.isArray(newOrder.items)) {
-      newOrder.items = await Promise.all(
-        newOrder.items.map(async (x) => {
-          let lesson = null;
+    // 📌 Convert order items into readable enriched format
+    const enrichedItems = [];
+    let totalAmount = 0;
 
-          try {
-            lesson = await db.collection("lessons").findOne({ _id: new ObjectId(x.lessonId) });
-          } catch {
-            lesson = null;
-          }
+    for (const item of newOrder.items) {
+      const lesson = await db.collection(LESSON_COLL).findOne({ id: item.lessonId });
 
-          return {
-            lessonId: x.lessonId,
-            subject: lesson?.subject || "Unknown",
-            quantity: x.quantity || 1,
-            price: lesson?.price || 0,
-            total: ((lesson?.price || 0) * (x.quantity || 1)).toFixed(2)
-          };
-        })
-      );
+      enrichedItems.push({
+        lessonId: item.lessonId,
+        subject: lesson?.subject || "Unknown",
+        price: lesson?.price || 0,
+        quantity: item.quantity || 1,
+        total: Number(lesson?.price || 0) * (item.quantity || 1)
+      });
 
-      newOrder.numberOfSpaces = newOrder.items.reduce((acc, i) => acc + i.quantity, 0);
-    } else {
-      newOrder.items = [];
-      newOrder.numberOfSpaces = 0;
+      totalAmount += Number(lesson?.price || 0) * (item.quantity || 1);
     }
 
-    delete newOrder.productList;
+    newOrder.items = enrichedItems;
+    newOrder.totalAmount = totalAmount.toFixed(2);
+    newOrder.numberOfSpaces = enrichedItems.reduce((a, b) => a + b.quantity, 0);
     newOrder.createdAt = new Date();
 
     const result = await db.collection(ORDER_COLL).insertOne(newOrder);
 
-    res.status(201).json({ message: "Order saved", orderId: result.insertedId });
+    res.status(201).json({ message: "Order stored", orderId: result.insertedId });
 
-  } catch (error) {
-    res.status(500).json({ error: "Failed to save order" });
+  } catch (err) {
+    console.error("ORDER SAVE ERROR:", err);
+    res.status(500).json({ error: "Could not save order" });
   }
 });
 
