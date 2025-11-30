@@ -4,33 +4,44 @@ import { getDB } from "../db.js";
 const router = express.Router();
 const ORDER_COLL = "order";
 
-
-//   POST /orders  
+// POST /orders → Save new order properly formatted
 router.post("/", async (req, res) => {
   try {
     const db = getDB();
     const newOrder = req.body;
 
-    if (!newOrder || !newOrder.items || newOrder.items.length === 0) {
-      return res.status(400).json({ error: "Order must include items" });
+    if (!newOrder || Object.keys(newOrder).length === 0) {
+      return res.status(400).json({ error: "Order data is required" });
     }
 
-    // Build list of lesson IDs
-    newOrder.lessonIDs = newOrder.items.map(i => i.lessonId);
+    // Convert items → readable format {subject , quantity}
+    if (Array.isArray(newOrder.items)) {
 
-    // Store Product Name + Quantity 
-    newOrder.productList = newOrder.items.map(i => ({
-      lessonId: i.lessonId,
-      productName: i.subject,  // subject from frontend
-      quantity: i.quantity
-    }));
+      // Store subject + qty cleanly as main structure
+      newOrder.items = newOrder.items.map(item => ({
+        subject: item.subject || "Unknown Lesson",
+        quantity: item.quantity || 1
+      }));
 
-    // Count total quantity (spaces)
-    newOrder.numberOfSpaces = newOrder.items.reduce(
-      (acc, i) => acc + i.quantity,
-      0
-    );
+      // Separate productList same format
+      newOrder.productList = newOrder.items.map(item => ({
+        subject: item.subject,
+        quantity: item.quantity
+      }));
 
+      // Count total quantity purchased
+      newOrder.numberOfSpaces = newOrder.items.reduce(
+        (acc, item) => acc + item.quantity,
+        0
+      );
+    } 
+    else {
+      newOrder.items = [];
+      newOrder.productList = [];
+      newOrder.numberOfSpaces = 0;
+    }
+
+    // Add date automatically
     newOrder.createdAt = new Date();
 
     const result = await db.collection(ORDER_COLL).insertOne(newOrder);
@@ -38,7 +49,6 @@ router.post("/", async (req, res) => {
     res.status(201).json({
       message: "Order saved successfully",
       orderId: result.insertedId,
-      saved: newOrder
     });
 
   } catch (error) {
@@ -47,17 +57,5 @@ router.post("/", async (req, res) => {
   }
 });
 
-
-//   GET /orders (View all)
-router.get("/", async (req, res) => {
-  try {
-    const db = getDB();
-    const orders = await db.collection(ORDER_COLL).find({}).toArray();
-    res.json(orders);
-  } catch (error) {
-    console.error("Failed to fetch orders:", error);
-    res.status(500).json({ error: "Cannot fetch orders" });
-  }
-});
-
 export default router;
+
