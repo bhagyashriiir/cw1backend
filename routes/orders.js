@@ -4,46 +4,59 @@ import { getDB } from "../db.js";
 const router = express.Router();
 const ORDER_COLL = "order";
 
-// POST /orders -save a new order
+
+//   POST /orders  
 router.post("/", async (req, res) => {
   try {
     const db = getDB();
     const newOrder = req.body;
 
-    if (!newOrder || Object.keys(newOrder).length === 0) {
-      return res.status(400).json({ error: "Order data is required" });
+    if (!newOrder || !newOrder.items || newOrder.items.length === 0) {
+      return res.status(400).json({ error: "Order must include items" });
     }
 
-    // Generate lessonIDs + numberOfSpaces automatically
-    if (Array.isArray(newOrder.items)) {
-  // Use lessonId exactly as frontend sends it
-  newOrder.lessonIDs = newOrder.items.map(item => item.lessonId);
+    // Build list of lesson IDs
+    newOrder.lessonIDs = newOrder.items.map(i => i.lessonId);
 
-  // Count number of spaces (quantities)
-  newOrder.numberOfSpaces = newOrder.items.reduce(
-    (acc, item) => acc + (item.quantity || 1),
-    0
-  );
-}
-    else {
-      newOrder.lessonIDs = [];
-      newOrder.numberOfSpaces = 0;
-    }
+    // Store Product Name + Quantity 
+    newOrder.productList = newOrder.items.map(i => ({
+      lessonId: i.lessonId,
+      productName: i.subject,  // subject from frontend
+      quantity: i.quantity
+    }));
 
-    // Add timestamp
+    // Count total quantity (spaces)
+    newOrder.numberOfSpaces = newOrder.items.reduce(
+      (acc, i) => acc + i.quantity,
+      0
+    );
+
     newOrder.createdAt = new Date();
 
-    // Insert into DB
     const result = await db.collection(ORDER_COLL).insertOne(newOrder);
 
     res.status(201).json({
       message: "Order saved successfully",
       orderId: result.insertedId,
+      saved: newOrder
     });
 
   } catch (error) {
     console.error("Error saving order:", error);
     res.status(500).json({ error: "Failed to save order" });
+  }
+});
+
+
+//   GET /orders (View all)
+router.get("/", async (req, res) => {
+  try {
+    const db = getDB();
+    const orders = await db.collection(ORDER_COLL).find({}).toArray();
+    res.json(orders);
+  } catch (error) {
+    console.error("Failed to fetch orders:", error);
+    res.status(500).json({ error: "Cannot fetch orders" });
   }
 });
 
