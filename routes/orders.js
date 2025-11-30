@@ -4,35 +4,47 @@ import { getDB } from "../db.js";
 const router = express.Router();
 const ORDER_COLL = "order";
 
-// POST /orders  ---> Save order in readable structured format
+// POST /orders  Save order with subject + quantity 
 router.post("/", async (req, res) => {
   try {
     const db = getDB();
-    const order = req.body;
+    const newOrder = req.body;
 
-    if (!order || !order.items || order.items.length === 0) {
-      return res.status(400).json({ error: "Order items required" });
+    if (!newOrder || Object.keys(newOrder).length === 0) {
+      return res.status(400).json({ error: "Order data is required" });
     }
 
-    // ---> Convert items into readable structure
-    order.items = order.items.map(i => ({
-      subject: i.subject,          // product name
-      price: i.price,              // price per item
-      quantity: i.quantity,        // qty requested
-      total: (i.price * i.quantity).toFixed(2)
-    }));
+    // Format items to readable form
+    if (Array.isArray(newOrder.items)) {
+      newOrder.items = await Promise.all(
+        newOrder.items.map(async (x) => {
+          const lesson = await db.collection("lessons").findOne({ _id: x.lessonId });
 
-    // Lesson IDs only for reference
-    order.lessonIDs = order.items.map(i => i.lessonId);
+          return {
+            lessonId: x.lessonId,
+            subject: lesson?.subject || "Unknown",
+            quantity: x.quantity || 1,
+            total: ((lesson?.price || 0) * (x.quantity || 1)).toFixed(2)
+          };
+        })
+      );
 
-    // Count total quantity
-    order.numberOfSpaces = order.items.reduce((a, i) => a + i.quantity, 0);
+      newOrder.numberOfSpaces = newOrder.items.reduce(
+        (acc, i) => acc + i.quantity,
+        0
+      );
+    } else {
+      newOrder.items = [];
+      newOrder.numberOfSpaces = 0;
+    }
+
+    delete newOrder.productList;
 
     // Add timestamp
-    order.createdAt = new Date();
+    newOrder.createdAt = new Date();
 
-    // Save final order
-    const result = await db.collection(ORDER_COLL).insertOne(order);
+    // Insert in database
+    const result = await db.collection(ORDER_COLL).insertOne(newOrder);
 
     res.status(201).json({
       message: "Order saved successfully",
@@ -40,8 +52,8 @@ router.post("/", async (req, res) => {
     });
 
   } catch (error) {
-    console.error("Order save failed:", error);
-    res.status(500).json({ error: "Order save failed" });
+    console.error("Error saving order:", error);
+    res.status(500).json({ error: "Failed to save order" });
   }
 });
 
