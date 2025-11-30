@@ -1,58 +1,48 @@
 import express from "express";
 import { getDB } from "../db.js";
-import { ObjectId } from "mongodb";
 
 const router = express.Router();
-
-// Your REAL collection name 👇
 const ORDER_COLL = "order";
-const LESSON_COLL = "lesson";  // <— THIS WAS THE REAL FIX
+const LESSON_COLL = "lesson";   // <── important
 
 router.post("/", async (req, res) => {
   try {
     const db = getDB();
     const newOrder = req.body;
 
-    if (!newOrder || !Array.isArray(newOrder.items)) {
-      return res.status(400).json({ error: "Invalid order data" });
+    if (!newOrder.items || newOrder.items.length === 0) {
+      return res.status(400).json({ error: "Order must include items" });
     }
 
-    const finalItems = [];
-    let totalCost = 0;
+    // Fetch full lesson details for each item
+    newOrder.items = await Promise.all(
+      newOrder.items.map(async (item) => {
+        const lesson = await db.collection(LESSON_COLL).findOne({ _id: item.lessonId });
 
-    for (const item of newOrder.items) {
+        return {
+          lessonId: item.lessonId,
+          subject: lesson?.subject || "❗ Subject Not Found",
+          price: lesson?.price || 0,
+          quantity: item.quantity || 1,
+          total: ((lesson?.price || 0) * (item.quantity || 1)).toFixed(2)
+        };
+      })
+    );
 
-      // Fetch lesson details properly
-      const lesson = await db.collection(LESSON_COLL).findOne({
-        _id: new ObjectId(item.lessonId)
-      });
+    // Calculate total qty purchased
+    newOrder.numberOfSpaces = newOrder.items.reduce((acc, i) => acc + i.quantity, 0);
 
-      finalItems.push({
-        lessonId: item.lessonId,
-        subject: lesson?.subject ?? "❗ NO SUBJECT FOUND",
-        price: Number(lesson?.price ?? 0),
-        quantity: Number(item.quantity ?? 1),
-        total: Number(lesson?.price ?? 0) * Number(item.quantity ?? 1)
-      });
+    // Calculate full bill amount
+    newOrder.totalAmount = newOrder.items.reduce((acc, i) => acc + Number(i.total), 0).toFixed(2);
 
-      totalCost += Number(lesson?.price ?? 0) * Number(item.quantity ?? 1);
-    }
-
-    newOrder.items = finalItems;
-    newOrder.total = totalCost.toFixed(2);
-    newOrder.numberOfSpaces = finalItems.reduce((sum, i) => sum + i.quantity, 0);
     newOrder.createdAt = new Date();
 
-    const response = await db.collection(ORDER_COLL).insertOne(newOrder);
+    const result = await db.collection(ORDER_COLL).insertOne(newOrder);
 
-    return res.status(201).json({
-      message: "ORDER SAVED SUCCESSFULLY 🎉",
-      orderId: response.insertedId
-    });
+    res.status(201).json({ message: "Order saved", orderId: result.insertedId });
 
-  } catch (err) {
-    console.log("❌ ORDER ERROR:", err);
-    res.status(500).json({ error: "Order saving failed" });
+  } catch (e) {
+    res.status(500).json({ error: "Order failed", details: e });
   }
 });
 
