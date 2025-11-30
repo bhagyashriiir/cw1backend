@@ -1,39 +1,53 @@
 import express from "express";
 import { getDB } from "../db.js";
+import { ObjectId } from "mongodb";
 
 const router = express.Router();
 const ORDER_COLL = "order";
 
-// POST /orders
+// POST /orders  (Now fetches subject + price securely)
 router.post("/", async (req, res) => {
   try {
     const db = getDB();
-    const newOrder = req.body;
+    const order = req.body;
 
-    if (!newOrder || !Array.isArray(newOrder.items) || newOrder.items.length === 0)
-      return res.status(400).json({ error: "Invalid Order" });
+    if (!order.items || order.items.length === 0) {
+      return res.status(400).json({ error: "Cart cannot be empty" });
+    }
 
-    // Clean items and enforce fallback values
-    newOrder.items = newOrder.items.map(item => ({
-      lessonId: item.lessonId,
-      subject: item.subject || "No Subject Found",
-      price: item.price ?? 0,
-      quantity: item.quantity ?? 1,
-      total: item.price * item.quantity
-    }));
+    // Convert lessonId into object details directly from DB
+    const finalItems = [];
 
-    // Count total purchased quantity
-    newOrder.numberOfSpaces = newOrder.items.reduce((s, x) => s + x.quantity, 0);
+    for (let item of order.items) {
+      const lesson = await db.collection("lesson").findOne({ 
+        _id: new ObjectId(item.lessonId) 
+      });
 
-    newOrder.createdAt = new Date();
+      finalItems.push({
+        lessonId: item.lessonId,
+        subject: lesson?.subject || "⚠ No Subject Found",
+        price: lesson?.price || 0,
+        quantity: item.quantity || 1,
+        total: (lesson?.price || 0) * (item.quantity || 1)
+      });
+    }
 
-    await db.collection(ORDER_COLL).insertOne(newOrder);
+    // Replace items with fully populated version
+    order.items = finalItems;
+    order.numberOfSpaces = finalItems.reduce((s,i)=>s+i.quantity,0);
+    order.totalAmount = finalItems.reduce((s,i)=>s+i.total,0);
+    order.createdAt = new Date();
 
-    res.status(201).json({ message: "Order saved successfully" });
+    const result = await db.collection(ORDER_COLL).insertOne(order);
+
+    res.status(201).json({
+      message:"Order saved with full product info 🎉",
+      orderId: result.insertedId
+    });
 
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Order failed to save" });
+    console.log(err);
+    res.status(500).json({ error:"Order save failed" });
   }
 });
 
