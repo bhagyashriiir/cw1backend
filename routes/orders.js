@@ -3,46 +3,37 @@ import { getDB } from "../db.js";
 
 const router = express.Router();
 const ORDER_COLL = "order";
-const LESSON_COLL = "lesson";   // <── important
 
+// POST /orders
 router.post("/", async (req, res) => {
   try {
     const db = getDB();
     const newOrder = req.body;
 
-    if (!newOrder.items || newOrder.items.length === 0) {
-      return res.status(400).json({ error: "Order must include items" });
-    }
+    if (!newOrder || !Array.isArray(newOrder.items) || newOrder.items.length === 0)
+      return res.status(400).json({ error: "Invalid Order" });
 
-    // Fetch full lesson details for each item
-    newOrder.items = await Promise.all(
-      newOrder.items.map(async (item) => {
-        const lesson = await db.collection(LESSON_COLL).findOne({ _id: item.lessonId });
+    // Clean items and enforce fallback values
+    newOrder.items = newOrder.items.map(item => ({
+      lessonId: item.lessonId,
+      subject: item.subject || "No Subject Found",
+      price: item.price ?? 0,
+      quantity: item.quantity ?? 1,
+      total: item.price * item.quantity
+    }));
 
-        return {
-          lessonId: item.lessonId,
-          subject: lesson?.subject || "❗ Subject Not Found",
-          price: lesson?.price || 0,
-          quantity: item.quantity || 1,
-          total: ((lesson?.price || 0) * (item.quantity || 1)).toFixed(2)
-        };
-      })
-    );
-
-    // Calculate total qty purchased
-    newOrder.numberOfSpaces = newOrder.items.reduce((acc, i) => acc + i.quantity, 0);
-
-    // Calculate full bill amount
-    newOrder.totalAmount = newOrder.items.reduce((acc, i) => acc + Number(i.total), 0).toFixed(2);
+    // Count total purchased quantity
+    newOrder.numberOfSpaces = newOrder.items.reduce((s, x) => s + x.quantity, 0);
 
     newOrder.createdAt = new Date();
 
-    const result = await db.collection(ORDER_COLL).insertOne(newOrder);
+    await db.collection(ORDER_COLL).insertOne(newOrder);
 
-    res.status(201).json({ message: "Order saved", orderId: result.insertedId });
+    res.status(201).json({ message: "Order saved successfully" });
 
-  } catch (e) {
-    res.status(500).json({ error: "Order failed", details: e });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Order failed to save" });
   }
 });
 
